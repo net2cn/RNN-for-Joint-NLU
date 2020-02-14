@@ -32,7 +32,7 @@ def train(config):
 
     loss_function_1 = nn.CrossEntropyLoss(ignore_index=0)
     loss_function_2 = nn.CrossEntropyLoss()
-    enc_optim= optim.Adam(encoder.parameters(), lr=config.learning_rate)
+    enc_optim = optim.Adam(encoder.parameters(), lr=config.learning_rate)
     dec_optim = optim.Adam(decoder.parameters(),lr=config.learning_rate)
     
     for step in range(config.step_size):
@@ -42,26 +42,30 @@ def train(config):
             x = torch.cat(x)
             tag_target = torch.cat(y_1)
             intent_target = torch.cat(y_2)
-            x_mask = torch.cat([Variable(torch.ByteTensor(tuple(map(lambda s: s ==0, t.data)))).cuda() if USE_CUDA else Variable(torch.ByteTensor(tuple(map(lambda s: s ==0, t.data)))) for t in x]).view(config.batch_size,-1)
-            y_1_mask = torch.cat([Variable(torch.ByteTensor(tuple(map(lambda s: s ==0, t.data)))).cuda() if USE_CUDA else Variable(torch.ByteTensor(tuple(map(lambda s: s ==0, t.data)))) for t in tag_target]).view(config.batch_size,-1)
+            # Changed "ByteTensor" to "BoolTensor" to get rid of the annoying UserWarning.
+            x_mask = torch.cat([Variable(torch.BoolTensor(tuple(map(lambda s: s ==0, t.data)))).cuda() if USE_CUDA else Variable(torch.BoolTensor(tuple(map(lambda s: s ==0, t.data)))) for t in x]).view(config.batch_size,-1)
+            y_1_mask = torch.cat([Variable(torch.BoolTensor(tuple(map(lambda s: s ==0, t.data)))).cuda() if USE_CUDA else Variable(torch.BoolTensor(tuple(map(lambda s: s ==0, t.data)))) for t in tag_target]).view(config.batch_size,-1)
 
             encoder.zero_grad()
             decoder.zero_grad()
 
-            output, hidden_c = encoder(x,x_mask)
-            start_decode = Variable(torch.LongTensor([[word2index['<SOS>']]*config.batch_size])).cuda().transpose(1,0) if USE_CUDA else Variable(torch.LongTensor([[word2index['<SOS>']]*config.batch_size])).transpose(1,0)
+            output, hidden_c = encoder(x, x_mask)
+            if USE_CUDA:
+                start_decode = Variable(torch.LongTensor([[word2index['<SOS>']]*config.batch_size])).cuda().transpose(1, 0)
+            else:
+                start_decode = Variable(torch.LongTensor([[word2index['<SOS>']]*config.batch_size])).transpose(1, 0)
 
-            tag_score, intent_score = decoder(start_decode,hidden_c,output,x_mask)
+            tag_score, intent_score = decoder(start_decode, hidden_c, output, x_mask)
 
-            loss_1 = loss_function_1(tag_score,tag_target.view(-1))
-            loss_2 = loss_function_2(intent_score,intent_target)
+            loss_1 = loss_function_1(tag_score, tag_target.view(-1))
+            loss_2 = loss_function_2(intent_score, intent_target)
 
             loss = loss_1+loss_2
-            losses.append(loss.data.cpu().numpy()[0] if USE_CUDA else loss.data.numpy()[0])
+            losses.append(loss.item())
             loss.backward()
 
-            torch.nn.utils.clip_grad_norm(encoder.parameters(), 5.0)
-            torch.nn.utils.clip_grad_norm(decoder.parameters(), 5.0)
+            torch.nn.utils.clip_grad_norm_(encoder.parameters(), 5.0)
+            torch.nn.utils.clip_grad_norm_(decoder.parameters(), 5.0)
 
             enc_optim.step()
             dec_optim.step()
@@ -86,16 +90,17 @@ if __name__ == '__main__':
                         help='path for saving trained models')
 
     # Model parameters
-    parser.add_argument('--max_length', type=int , default=60 ,
+    parser.add_argument('--max_length', type=int , default=60,
                         help='max sequence length')
-    parser.add_argument('--embedding_size', type=int , default=64 ,
+    parser.add_argument('--embedding_size', type=int , default=128,
                         help='dimension of word embedding vectors')
-    parser.add_argument('--hidden_size', type=int , default=64 ,
+    parser.add_argument('--hidden_size', type=int , default=100,
                         help='dimension of lstm hidden states')
-    parser.add_argument('--num_layers', type=int , default=1 ,
+    parser.add_argument('--num_layers', type=int , default=2,
                         help='number of layers in lstm')
-    
-    parser.add_argument('--step_size', type=int, default=5)
+
+    # Train parameters
+    parser.add_argument('--step_size', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--learning_rate', type=float, default=0.001)
     config = parser.parse_args()

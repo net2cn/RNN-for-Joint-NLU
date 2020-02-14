@@ -42,7 +42,9 @@ def preprocessing(file_path,length):
     try:
         train = [t[:-1] for t in train]
         train = [[t.split("\t")[0].split(" "),t.split("\t")[1].split(" ")[:-1],t.split("\t")[1].split(" ")[-1]] for t in train]
-        train = [[t[0][1:-1],t[1][1:],t[2]] for t in train]
+        # To get rid of multi intents
+        # train = [[t[0][1:-1],t[1][1:],t[2]] for t in train]
+        train = [[t[0][1:-1],t[1][1:],t[2].split("#")[0]] for t in train]
 
         seq_in,seq_out, intent = list(zip(*train))
         vocab = set(flatten(seq_in))
