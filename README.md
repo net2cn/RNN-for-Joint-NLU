@@ -22,6 +22,9 @@ You can get data from [JointSLU](https://github.com/yvchen/JointSLU/tree/master/
 ## Run
 `python run.py --train_path "the train dataset you used to train" --test_path "the test dataset you want to use"`
 
+## Known issue
+Model trained on GPU cannot be used on a pure CPU environment.
+
 
 ## Result
 
